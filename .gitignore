@@ -2,3 +2,4 @@ output
 *.pth
 *.txt
 pics
+*.pyc

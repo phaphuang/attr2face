@@ -20,7 +20,6 @@ from data_with_encoder import check_attribute_conflict
 from helpers import Progressbar, add_scalar_dict
 from tensorboardX import SummaryWriter
 
-from loss import CXLoss
 from vgg_cx import VGG19_CX
 
 
@@ -65,12 +64,12 @@ def parse(args=None):
     
     parser.add_argument('--mode', dest='mode', default='wgan', choices=['wgan', 'lsgan', 'dcgan'])
     parser.add_argument('--epochs', dest='epochs', type=int, default=200, help='# of epochs')
-    parser.add_argument('--batch_size', dest='batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', dest='batch_size', type=int, default=8)
     parser.add_argument('--num_workers', dest='num_workers', type=int, default=0)
     parser.add_argument('--lr', dest='lr', type=float, default=0.0002, help='learning rate')
     parser.add_argument('--beta1', dest='beta1', type=float, default=0.5)
     parser.add_argument('--beta2', dest='beta2', type=float, default=0.999)
-    parser.add_argument('--n_d', dest='n_d', type=int, default=5, help='# of d updates per g update')
+    parser.add_argument('--n_d', dest='n_d', type=int, default=1, help='# of d updates per g update')
     
     parser.add_argument('--b_distribution', dest='b_distribution', default='none', choices=['none', 'uniform', 'truncated_normal'])
     parser.add_argument('--thres_int', dest='thres_int', type=float, default=0.5)
@@ -123,17 +122,15 @@ print('Training images:', len(train_dataset), '/', 'Validating images:', len(val
 #### Including vgg network
 # CX Loss
 if args.lambda_cx > 0:
-    criterion_cx = CXLoss(sigma=0.5).to(device)
     vgg19 = VGG19_CX().to(device)
     vgg19.load_model('vgg19-dcbb9e9d.pth')
     vgg19.eval()
-    vgg_layers = ['conv3_3', 'conv4_2']
 
 attgan = AttGAN(args, vgg19)
 progressbar = Progressbar()
 writer = SummaryWriter(join('output', args.experiment_name, 'summary'))
 
-fixed_img_a, fixed_att_a = next(iter(valid_dataloader))
+fixed_img_a, fixed_att_a, fixed_img_b, fixed_att_b = next(iter(valid_dataloader))
 fixed_img_a = fixed_img_a.cuda() if args.gpu else fixed_img_a
 fixed_att_a = fixed_att_a.cuda() if args.gpu else fixed_att_a
 fixed_att_a = fixed_att_a.type(torch.float)
@@ -153,16 +150,19 @@ for epoch in range(args.epochs):
     lr = args.lr_base / (10 ** (epoch // 100))
     attgan.set_lr(lr)
     writer.add_scalar('LR/learning_rate', lr, it+1)
-    for img_a, att_a in progressbar(train_dataloader):
+    for img_a, att_a, img_b, att_b in progressbar(train_dataloader):
         attgan.train()
         
         img_a = img_a.cuda() if args.gpu else img_a
         att_a = att_a.cuda() if args.gpu else att_a
-        idx = torch.randperm(len(att_a))
-        att_b = att_a[idx].contiguous()
+        #idx = torch.randperm(len(att_a))
+        #att_b = att_a[idx].contiguous()
+        img_b = img_b.cuda() if args.gpu else img_b
+        att_b = att_b.cuda() if args.gpu else att_b
+        att_b = att_b.contiguous()
         
-        real_img_B, real_att_B = train_dataset.sample_from_attribute(att_b, args.batch_size)
-        print(real_img_B.shape, real_att_B.shape)
+        #real_img_B, real_att_B = train_dataset.sample_from_attribute(att_b, args.batch_size)
+        #print(img_b.shape, att_b.shape)
 
         att_a = att_a.type(torch.float)
         att_b = att_b.type(torch.float)
@@ -183,7 +183,7 @@ for epoch in range(args.epochs):
             errD = attgan.trainD(img_a, att_a, att_a_, att_b, att_b_)
             add_scalar_dict(writer, errD, it+1, 'D')
         else:
-            errG = attgan.trainG(img_a, att_a, att_a_, att_b, att_b_, real_img_B)
+            errG = attgan.trainG(img_a, att_a, att_a_, att_b, att_b_, img_b)
             add_scalar_dict(writer, errG, it+1, 'G')
             progressbar.say(epoch=epoch, iter=it+1, d_loss=errD['d_loss'], g_loss=errG['g_loss'])
         

@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from nn import LinearBlock, Conv2dBlock, ConvTranspose2dBlock
 from torchsummary import summary
+from loss import CXLoss
 
 
 # This architecture is for images of 128x128
@@ -134,6 +135,8 @@ class AttGAN():
         self.lambda_cx = args.lambda_cx
 
         self.vgg19 = vgg_network
+        self.vgg_layers = ['conv3_3', 'conv4_2']
+        self.criterion_cx = CXLoss(sigma=0.5).to(device)
         
         self.G = Generator(
             args.enc_dim, args.enc_layers, args.enc_norm, args.enc_acti,
@@ -153,7 +156,7 @@ class AttGAN():
         summary(self.D, [(3, args.img_size, args.img_size)], batch_size=4, device='cuda' if args.gpu else 'cpu')
 
         #### Calculating Embedding ####
-        self.attribute_embed = nn.Embedding(args.n_attrs, args.img_size)
+        self.attribute_embed = nn.Embedding(args.n_attrs, args.img_size).to(device)
 
         self.attrid = torch.tensor([i for i in range(args.n_attrs)]).to(device)
         self.attrid = self.attrid.view(1, self.attrid.size(0))
@@ -193,7 +196,6 @@ class AttGAN():
             gf_loss = F.binary_cross_entropy_with_logits(d_fake, torch.ones_like(d_fake))
         gc_loss = F.binary_cross_entropy_with_logits(dc_fake, att_b)
         gr_loss = F.l1_loss(img_recon, img_a)
-        g_loss = gf_loss + self.lambda_2 * gc_loss + self.lambda_1 * gr_loss
 
         #### Calculating Attribute losses ####
         # Construct attribute
@@ -211,18 +213,27 @@ class AttGAN():
         delta_intensity = attr_B_intensity - attr_A_intensity
         delta_attr = attr_B - attr_A
 
-        if args.lambda_cx > 0:
+        if self.lambda_cx > 0:
             vgg_fake_B = self.vgg19(img_fake)
             vgg_img_B = self.vgg19(img_B)
+        # CX loss
+        loss_CX = torch.zeros(1).to(device)
+        if self.lambda_cx > 0:
+            for l in self.vgg_layers:
+                cx = self.criterion_cx(vgg_img_B[l], vgg_fake_B[l])
+                loss_CX += cx * self.lambda_cx
         
         
+        g_loss = gf_loss + self.lambda_2 * gc_loss + self.lambda_1 * gr_loss + loss_CX
+
         self.optim_G.zero_grad()
         g_loss.backward()
         self.optim_G.step()
         
         errG = {
             'g_loss': g_loss.item(), 'gf_loss': gf_loss.item(),
-            'gc_loss': gc_loss.item(), 'gr_loss': gr_loss.item()
+            'gc_loss': gc_loss.item(), 'gr_loss': gr_loss.item(),
+            'cx_loss': loss_CX.item()
         }
         return errG
     

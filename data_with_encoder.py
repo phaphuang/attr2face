@@ -71,9 +71,17 @@ class CelebA(data.Dataset):
         img = self.tf(Image.open(os.path.join(self.data_path, self.images[index])))
         att = self.labels[index]
 
-        
+        # Select image b
+        idx = torch.randperm(len(att))
+        att_b = att[idx]
+        label_index = self.labels.matmul(att_b)
+        label_index = (label_index == 1).nonzero()
+        task_idx = random.sample((list(label_index)), 1)
+        out_label = self.labels[task_idx[0]].squeeze()
+        #print(out_label.shape)
+        out_image = self.tf(Image.open(os.path.join(self.data_path, self.images[task_idx[0]])))
 
-        return img, att
+        return img, att, out_image, out_label
     def __len__(self):
         return self.length
 
