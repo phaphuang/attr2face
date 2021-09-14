@@ -16,7 +16,7 @@ import torch.utils.data as data
 import torch
 import torchvision.utils as vutils
 from attr2font import DiscriminatorWithClassifier, GeneratorStyle
-from data_with_attr2font import check_attribute_conflict
+from data_with_attr2font import check_attribute_conflict, CelebA, CelebA_HQ
 from helpers import Progressbar, add_scalar_dict
 from tensorboardX import SummaryWriter
 
@@ -118,11 +118,9 @@ with open(join('output', args.experiment_name, 'setting.txt'), 'w') as f:
     f.write(json.dumps(vars(args), indent=4, separators=(',', ':')))
 
 if args.data == 'CelebA':
-    from data_with_encoder import CelebA
     train_dataset = CelebA(args.data_path, args.attr_path, args.img_size, 'train', args.attrs)
     valid_dataset = CelebA(args.data_path, args.attr_path, args.img_size, 'valid', args.attrs)
 if args.data == 'CelebA-HQ':
-    from data_with_encoder import CelebA_HQ
     train_dataset = CelebA_HQ(args.data_path, args.attr_path, args.image_list_path, args.img_size, 'train', args.attrs)
     valid_dataset = CelebA_HQ(args.data_path, args.attr_path, args.image_list_path, args.img_size, 'valid', args.attrs)
 train_dataloader = data.DataLoader(
