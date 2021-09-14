@@ -85,6 +85,7 @@ def parse(args=None):
     parser.add_argument("--attr_embed", type=int, default=128,
                         help="attribute embedding channel, attribute id to attr_embed, must same as image size")
     parser.add_argument("--lambda_cx", type=float, default=6.0, help='Contextual loss lambda')
+    parser.add_argument("--n_style", type=int, default=4, help="number of style input images")
     
     return parser.parse_args(args)
 
@@ -103,8 +104,8 @@ with open(join('output', args.experiment_name, 'setting.txt'), 'w') as f:
 
 if args.data == 'CelebA':
     from data_with_encoder import CelebA
-    train_dataset = CelebA(args.data_path, args.attr_path, args.img_size, 'train', args.attrs)
-    valid_dataset = CelebA(args.data_path, args.attr_path, args.img_size, 'valid', args.attrs)
+    train_dataset = CelebA(args.data_path, args.attr_path, args.img_size, 'train', args.attrs, args.n_style)
+    valid_dataset = CelebA(args.data_path, args.attr_path, args.img_size, 'valid', args.attrs, args.n_style)
 if args.data == 'CelebA-HQ':
     from data_with_encoder import CelebA_HQ
     train_dataset = CelebA_HQ(args.data_path, args.attr_path, args.image_list_path, args.img_size, 'train', args.attrs)

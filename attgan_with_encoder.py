@@ -114,8 +114,6 @@ class Discriminators(nn.Module):
         h = h.view(h.size(0), -1)
         return self.fc_adv(h), self.fc_cls(h)
 
-
-
 import torch.autograd as autograd
 import torch.nn.functional as F
 import torch.optim as optim
