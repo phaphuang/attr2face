@@ -74,12 +74,17 @@ class CelebA(data.Dataset):
         att = self.labels[index]
 
         # Find style of input image
-        att_a_list = torch.nonzero(att == 1)
-        rand_index = torch.randint(0, len(att_a_list), (1,))
-        att_a = torch.zeros([self.len_attr], dtype=torch.double)
-        att_a[rand_index] = 1
-        label_index = self.labels.matmul(att_a)
-        label_index = torch.nonzero(label_index == 1)
+        try:
+            att_a_list = torch.nonzero(att == 1)
+            rand_index = torch.randint(0, len(att_a_list), (1,))
+            att_a = torch.zeros([self.len_attr], dtype=torch.double)
+            att_a[rand_index] = 1
+            label_index = self.labels.matmul(att_a)
+            label_index = torch.nonzero(label_index == 1)
+        except Exception as e:
+            print("Exception with error of ", att)
+            label_index = torch.nonzero(torch.sum(self.labels, dim=1) == 0)
+        
         task_idx_a = random.sample((list(label_index)), self.n_style)
         
         styles_A = []

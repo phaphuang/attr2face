@@ -39,8 +39,8 @@ def parse(args=None):
     
     parser.add_argument('--attrs', dest='attrs', default=attrs_default, nargs='+', help='attributes to learn')
     parser.add_argument('--data', dest='data', type=str, choices=['CelebA', 'CelebA-HQ'], default='CelebA')
-    parser.add_argument('--data_path', dest='data_path', type=str, default='../../My Project/data/celeba/img_align_celeba')
-    parser.add_argument('--attr_path', dest='attr_path', type=str, default='../../My Project/data/celeba/list_attr_celeba.txt')
+    parser.add_argument('--data_path', dest='data_path', type=str, default='../data/celeba/img_align_celeba')
+    parser.add_argument('--attr_path', dest='attr_path', type=str, default='../data/celeba/list_attr_celeba.txt')
     parser.add_argument('--image_list_path', dest='image_list_path', type=str, default='data/image_list.txt')
     
     parser.add_argument('--img_size', dest='img_size', type=int, default=64)
@@ -224,7 +224,7 @@ attrid = torch.tensor([i for i in range(args.n_attrs)]).to(device)
 attrid = attrid.view(1, attrid.size(0))
 attrid = attrid.repeat(args.batch_size, 1)
 
-for epoch in range(args.epochs):
+for epoch in range(args.init_epoch, args.epochs+1):
     # train with base lr in the first 100 epochs
     # and half the lr in the last 100 epochs
     for batch_idx, (img_A, styles_A, attr_A_data, styles_B, attr_B_data) in progressbar(enumerate(train_dataloader)):
