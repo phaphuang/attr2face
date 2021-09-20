@@ -8,11 +8,13 @@
 import numpy as np
 import os
 import torch
+from torch._C import device
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from PIL import Image
 import random
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Custom(data.Dataset):
     def __init__(self, data_path, attr_path, image_size, selected_attrs):
@@ -67,6 +69,8 @@ class CelebA(data.Dataset):
 
         self.labels = torch.tensor((self.labels + 1) // 2, dtype=torch.double)
         self.n_style = n_style
+
+        self.selected_attrs = selected_attrs
         self.len_attr = len(selected_attrs)
 
     def __getitem__(self, index):
@@ -116,6 +120,81 @@ class CelebA(data.Dataset):
         styles_B = torch.cat(styles_B)
 
         return img, styles_A, att.float(), styles_B, att_b.float()
+    
+    def check_attribute_conflict(self, att_batch, att_name, att_names):
+        def _get(att, att_name):
+            if att_name in att_names:
+                return att[att_names.index(att_name)]
+            return None
+        def _set(att, value, att_name):
+            if att_name in att_names:
+                att[att_names.index(att_name)] = value
+        att_id = att_names.index(att_name)
+        for att in att_batch:
+            if att_name in ['Bald', 'Receding_Hairline'] and att[att_id] != 0:
+                if _get(att, 'Bangs') != 0:
+                    _set(att, 1-att[att_id], 'Bangs')
+            elif att_name == 'Bangs' and att[att_id] != 0:
+                for n in ['Bald', 'Receding_Hairline']:
+                    if _get(att, n) != 0:
+                        _set(att, 1-att[att_id], n)
+                        _set(att, 1-att[att_id], n)
+            elif att_name in ['Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Gray_Hair'] and att[att_id] != 0:
+                for n in ['Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Gray_Hair']:
+                    if n != att_name and _get(att, n) != 0:
+                        _set(att, 1-att[att_id], n)
+            elif att_name in ['Straight_Hair', 'Wavy_Hair'] and att[att_id] != 0:
+                for n in ['Straight_Hair', 'Wavy_Hair']:
+                    if n != att_name and _get(att, n) != 0:
+                        _set(att, 1-att[att_id], n)
+            elif att_name in ['Mustache', 'No_Beard'] and att[att_id] != 0:
+                for n in ['Mustache', 'No_Beard']:
+                    if n != att_name and _get(att, n) != 0:
+                        _set(att, 1-att[att_id], n)
+        return att_batch
+
+    def get_style(self, fixed_att_a):
+
+        sample_att_b_list = []
+
+        for i in range(self.len_attr):
+            tmp = fixed_att_a.clone()
+            tmp[:, i] = 1 - tmp[:, i]
+            tmp = self.check_attribute_conflict(tmp, self.selected_attrs[i], self.selected_attrs)
+            tmp, tmp_style = self.query_style(tmp, self.selected_attrs[i], self.selected_attrs, i)
+            sample_att_b_list.append((tmp, tmp_style))
+        
+        return sample_att_b_list
+    
+    def query_style(self, att_batch, att_name, att_names, att_id):
+
+        all_styles_B = []
+
+        for idx, sample in enumerate(att_batch):
+            #### Return Style ####
+            #print(f"Sample {idx} Attribute: {att_name} Attribute id: {att_id}, Sample: {sample[att_id]}")
+            #selected_labels = self.labels[self.labels[:, att_id].to(device) == sample[att_id]]
+            #print(selected_labels)
+            #task_idx_b = random.sample(list(selected_labels), self.n_style)
+            selected_images = self.images[self.labels[:, att_id] == sample[att_id].cpu()]
+            sample_images = random.sample(list(selected_images), self.n_style)
+            #print(sample_images)
+
+            styles_B = []
+            if self.n_style == 1:
+                #styles_B.append(self.tf(Image.open(os.path.join(self.data_path, self.images[task_idx_b[0]]))))
+                styles_B.append(self.tf(Image.open(os.path.join(self.data_path, selected_images[0]))))
+            else:
+                for img in sample_images:
+                    styles_B.append(self.tf(Image.open(os.path.join(self.data_path, img))))
+                
+            styles_B = torch.cat(styles_B)
+            all_styles_B.append(styles_B.unsqueeze(0))
+        
+        all_styles_B = torch.cat(all_styles_B, dim=0)
+        
+        return att_batch, all_styles_B
+            
 
     def __len__(self):
         return self.length

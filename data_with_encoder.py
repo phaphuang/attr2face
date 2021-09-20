@@ -85,31 +85,6 @@ class CelebA(data.Dataset):
     def __len__(self):
         return self.length
 
-    def sample_from_attribute(self, attrs, batch_size=16):
-        print(self.labels.shape, attrs.shape)
-
-        for idx, attr in enumerate(attrs):
-            print(attr.squeeze())
-            label_index = self.labels.matmul(attr)
-            print(label_index[:10])
-            print(label_index.shape)
-            label_index = (label_index == 1).nonzero()  # from [0, 1, 1, 0] -> [1, 2]
-            print(label_index)
-
-            task_idx = random.sample((list(label_index)), batch_size)
-
-            if idx == 0:
-                out_label = [self.labels[x] for x in task_idx].unsqueeze(0)
-                out_image = [self.tf(Image.open(os.path.join(self.data_path, self.images[x]))) for x in task_idx].unsqeeze(0)
-            else:
-                out_label_temp = [self.labels[x] for x in task_idx].unsqueeze(0)
-                out_image_temp = [self.tf(Image.open(os.path.join(self.data_path, self.images[x]))) for x in task_idx].unsqeeze(0)
-                
-                out_label = torch.stack([out_label, out_label_temp], dim=0)
-                out_image = torch.stack([out_image, out_image_temp], dim=0)
-
-        return out_image, out_label
-
 class CelebA_HQ(data.Dataset):
     def __init__(self, data_path, attr_path, image_list_path, image_size, mode, selected_attrs):
         super(CelebA_HQ, self).__init__()
